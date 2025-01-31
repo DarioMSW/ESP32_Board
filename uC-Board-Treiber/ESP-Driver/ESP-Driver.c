@@ -55,7 +55,7 @@
 
 // Function prototypes
 void initI2C (void); 
-void mcp23017WriteRegister(uint8_t address, uint8_t register, uint8_t data);
+void mcp23017WriteRegister(uint8_t address, uint8_t reg, uint8_t data);
 void mcp23017InitIC2(void);
 void mcp23017InitIC3(void); 
 void ledWriteAll(uint16_t bitMask); 
@@ -63,6 +63,10 @@ uint8_t mcp23017ReadRegister(uint8_t address, uint8_t reg);
 uint8_t swtichReadAll();
 uint8_t buttonReadAll(); 
 
+// New I2C driver variables
+i2c_master_bus_handle_t i2c_bus_handle = NULL;
+i2c_master_dev_handle_t i2c_dev_handle_ic2 = NULL;
+i2c_master_dev_handle_t i2c_dev_handle_ic3 = NULL;
 
 void initBoard(uint8_t startAnimation){
     gpio_config_t io_conf = {}; // GPIO configuration
@@ -79,6 +83,8 @@ void initBoard(uint8_t startAnimation){
 } 
 
 void initI2C (void){ 
+    // Old I2C driver initialization (commented out)
+    /*
     int i2c_master_port = 0; // I2C port number for master dev
     i2c_config_t i2c_config = { // I2C master configuration
         .mode = I2C_MODE_MASTER, // I2C mode
@@ -91,9 +97,37 @@ void initI2C (void){
     };    
     i2c_param_config(I2C_NUM_0, &i2c_config); // Configure the I2C master driver
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0); // Install the I2C master driver
+    */
+
+    // New I2C driver initialization
+    i2c_master_bus_config_t i2c_bus_config = {
+        .i2c_port = I2C_NUM_0,
+        .sda_io_num = SDA,
+        .scl_io_num = SCL,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle));
+
+    i2c_device_config_t i2c_dev_config_ic2 = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = ADDR_IC2,
+        .scl_speed_hz = FREQ_I2C,
+    };
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus_handle, &i2c_dev_config_ic2, &i2c_dev_handle_ic2));
+
+    i2c_device_config_t i2c_dev_config_ic3 = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = ADDR_IC3,
+        .scl_speed_hz = FREQ_I2C,
+    };
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus_handle, &i2c_dev_config_ic3, &i2c_dev_handle_ic3));
 }
 
 void mcp23017WriteRegister(uint8_t address, uint8_t reg, uint8_t data){
+    // Old I2C driver code (commented out)
+    /*
     i2c_cmd_handle_t cmd = i2c_cmd_link_create(); // Create a new I2C command link
     i2c_master_start(cmd); // Start the I2C command
     i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_WRITE, true); // Write the I2C address
@@ -102,6 +136,12 @@ void mcp23017WriteRegister(uint8_t address, uint8_t reg, uint8_t data){
     i2c_master_stop(cmd); // Stop the I2C command 
     i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(1000)); // Execute the I2C command
     i2c_cmd_link_delete(cmd); // Delete the I2C command link
+    */
+
+    // New I2C driver code
+    i2c_master_dev_handle_t dev_handle = (address == ADDR_IC2) ? i2c_dev_handle_ic2 : i2c_dev_handle_ic3;
+    uint8_t write_buf[2] = {reg, data};
+    ESP_ERROR_CHECK(i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000)));
 }
 
 void mcp23017InitIC2(void){
@@ -122,8 +162,9 @@ void ledWriteAll(uint16_t bitMask){
 } 
 
 uint8_t mcp23017ReadRegister(uint8_t address, uint8_t reg){
+    // Old I2C driver code (commented out)
+    /*
     uint8_t data = 0; // Initialize data variable 
-
     i2c_cmd_handle_t cmd = i2c_cmd_link_create(); // Create a new I2C command link 
     i2c_master_start(cmd); // Start the I2C command 
     i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_WRITE, true); // Read the I2C address 
@@ -134,8 +175,14 @@ uint8_t mcp23017ReadRegister(uint8_t address, uint8_t reg){
     i2c_master_stop(cmd); // Stop the I2C command
     i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(1000)); // Execute the I2C command 
     i2c_cmd_link_delete(cmd); // Delete the I2C command link 
-
     return data; // Return the data
+    */
+
+    // New I2C driver code
+    uint8_t data = 0;
+    i2c_master_dev_handle_t dev_handle = (address == ADDR_IC2) ? i2c_dev_handle_ic2 : i2c_dev_handle_ic3;
+    ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &reg, 1, &data, 1, pdMS_TO_TICKS(1000)));
+    return data;
 }
 
 uint8_t swtichReadAll(){ 
@@ -144,8 +191,6 @@ uint8_t swtichReadAll(){
 
 uint8_t buttonReadAll(){
     uint8_t data = 0; // Initialize data variable 
-
     data = gpio_get_level(INPUT_BTN0) | gpio_get_level(INPUT_BTN1) << 1 | gpio_get_level(INPUT_BTN2) << 2 | gpio_get_level(INPUT_BTN3) << 3; // Read the data from the buttons
-
     return data; // Return the data
 }

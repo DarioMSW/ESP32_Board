@@ -37,7 +37,8 @@
 #include <esp_err.h>
 #include <esp_log.h> 
 #include <driver/gpio.h> 
-#include <driver/i2c.h>
+//#include <driver/i2c.h>
+#include <driver/i2c_master.h>
 
 void initBoard(uint8_t startAnimation);
 void initI2C (void); 
