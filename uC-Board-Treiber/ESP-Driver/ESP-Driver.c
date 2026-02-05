@@ -64,9 +64,10 @@ uint8_t swtichReadAll();
 uint8_t buttonReadAll(); 
 
 // New I2C driver variables
-i2c_master_bus_handle_t i2c_bus_handle = NULL;
-i2c_master_dev_handle_t i2c_dev_handle_ic2 = NULL;
-i2c_master_dev_handle_t i2c_dev_handle_ic3 = NULL;
+static i2c_master_bus_handle_t i2c_bus_handle = NULL;
+static i2c_master_dev_handle_t i2c_dev_handle_ic2 = NULL;
+static i2c_master_dev_handle_t i2c_dev_handle_ic3 = NULL;
+
 
 void initBoard(uint8_t startAnimation){
     gpio_config_t io_conf = {}; // GPIO configuration
@@ -78,8 +79,8 @@ void initBoard(uint8_t startAnimation){
     gpio_config(&io_conf); // Configure the GPIO
 
     initI2C(); // Initialize I2C
-    mcp23017InitIC2(); // Initialize MCP23017
     mcp23017InitIC3(); // Initialize MCP23017
+    mcp23017InitIC2(); // Initialize MCP23017
 } 
 
 void initI2C (void){ 
@@ -99,29 +100,30 @@ void initI2C (void){
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0); // Install the I2C master driver
     */
 
+    gpio_reset_pin(SDA);
+    gpio_reset_pin(SCL);
+
+
     // New I2C driver initialization
-    i2c_master_bus_config_t i2c_bus_config = {
-        .i2c_port = I2C_NUM_0,
-        .sda_io_num = SDA,
-        .scl_io_num = SCL,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
+    i2c_master_bus_config_t i2c_bus_config = {0};
+        i2c_bus_config.i2c_port = I2C_NUM_0;
+        i2c_bus_config.sda_io_num = SDA;
+        i2c_bus_config.scl_io_num = SCL;
+        i2c_bus_config.clk_source = I2C_CLK_SRC_DEFAULT;
+        i2c_bus_config.glitch_ignore_cnt = 0;//7
+        i2c_bus_config.flags.enable_internal_pullup = true;
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle));
 
-    i2c_device_config_t i2c_dev_config_ic2 = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = ADDR_IC2,
-        .scl_speed_hz = FREQ_I2C,
-    };
+    i2c_device_config_t i2c_dev_config_ic2 = {0};
+        i2c_dev_config_ic2.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+        i2c_dev_config_ic2.device_address = ADDR_IC2;
+        i2c_dev_config_ic2.scl_speed_hz = FREQ_I2C;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus_handle, &i2c_dev_config_ic2, &i2c_dev_handle_ic2));
 
-    i2c_device_config_t i2c_dev_config_ic3 = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = ADDR_IC3,
-        .scl_speed_hz = FREQ_I2C,
-    };
+    i2c_device_config_t i2c_dev_config_ic3 = {0};
+        i2c_dev_config_ic3.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+        i2c_dev_config_ic3.device_address = ADDR_IC3;
+        i2c_dev_config_ic3.scl_speed_hz = FREQ_I2C;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus_handle, &i2c_dev_config_ic3, &i2c_dev_handle_ic3));
 }
 
@@ -140,8 +142,19 @@ void mcp23017WriteRegister(uint8_t address, uint8_t reg, uint8_t data){
 
     // New I2C driver code
     i2c_master_dev_handle_t dev_handle = (address == ADDR_IC2) ? i2c_dev_handle_ic2 : i2c_dev_handle_ic3;
+
+    if (dev_handle == NULL) {
+        ESP_LOGE("I2C", "Fehler: Handle für 0x%02x ist NULL!", address);
+        return;
+    }
+
     uint8_t write_buf[2] = {reg, data};
-    ESP_ERROR_CHECK(i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000)));
+    //ESP_ERROR_CHECK(i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000)));
+    esp_err_t ret = i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000));
+    if (ret != ESP_OK) {
+        ESP_LOGE("I2C_DEBUG", "Adresse 0x%02X meldet Fehler: %s", address, esp_err_to_name(ret));
+        return; // Nicht abstürzen, einfach weitermachen
+    }
 }
 
 void mcp23017InitIC2(void){
@@ -181,7 +194,19 @@ uint8_t mcp23017ReadRegister(uint8_t address, uint8_t reg){
     // New I2C driver code
     uint8_t data = 0;
     i2c_master_dev_handle_t dev_handle = (address == ADDR_IC2) ? i2c_dev_handle_ic2 : i2c_dev_handle_ic3;
-    ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &reg, 1, &data, 1, pdMS_TO_TICKS(1000)));
+
+    if (dev_handle == NULL) {
+        ESP_LOGE("I2C_READ", "Fehler: Handle für 0x%02x ist NULL!", address);
+        return 0;
+    }
+
+    //ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &reg, 1, &data, 1, pdMS_TO_TICKS(1000)));
+    esp_err_t ret = i2c_master_transmit_receive(dev_handle, &reg, 1, &data, 1, pdMS_TO_TICKS(1000));
+
+    if (ret != ESP_OK) {
+        ESP_LOGE("I2C_READ", "Read-Fehler bei Chip 0x%02X, Reg 0x%02X: %s", address, reg, esp_err_to_name(ret));
+        return 0; // Oder ein spezifischer Fehlerwert
+    }
     return data;
 }
 

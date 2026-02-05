@@ -30,6 +30,11 @@
 \*********************************************************************************/
 #include <ESP-Driver.h>
 #include <led_strip.h>
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+
 
 #define OUTPUT_WS2812 38 
 
@@ -38,9 +43,13 @@
 #define INPUT_BTN2 36 
 #define INPUT_BTN3 37
 
+void blink_led_task(void *pvParameters);
+
 
 void app_main(void)
 {
+    static TaskHandle_t blinkTaskHandle = NULL;
+    static const char* TAG = "app_main"; // Ein Name für dein Modul
     //--------------------------------- LED Strip Configuration ---------------------------------
     led_strip_handle_t led_strip;
 
@@ -67,7 +76,11 @@ void app_main(void)
 
     //--------------------------------- initialize board ---------------------------------
     initBoard(0);
-    
+    // Task erstellen: Name, Stack-Größe (4096), Parameter (NULL), Priorität (5), Handle
+    //xTaskCreate(blink_led_task, "BlinkTask", 4096, NULL, 5, &blinkTaskHandle);
+    uint32_t iterations = 0;
+
+
     while (1)
     {
         if (gpio_get_level(INPUT_BTN0) | gpio_get_level(INPUT_BTN1) | gpio_get_level(INPUT_BTN2) | gpio_get_level(INPUT_BTN3))
@@ -80,9 +93,50 @@ void app_main(void)
             led_strip_set_pixel(led_strip, 1, 25, 1, 1); 
             led_strip_refresh(led_strip);
         }
-        
-        ledWriteAll(swtichReadAll()<<8 | buttonReadAll());
+        if(swtichReadAll()){
+            if (blinkTaskHandle == NULL) {
+                xTaskCreate(blink_led_task, "BlinkTask", 4096, NULL, 5, &blinkTaskHandle);
+                ESP_LOGI("TASK", "Task wurde erstellt.");
+            }
+        }else{
+            if (blinkTaskHandle != NULL) {
+                vTaskDelete(blinkTaskHandle);
+                blinkTaskHandle = NULL; // Wichtig, damit wir nicht auf ein ungültiges Handle zugreifen
+                ledWriteAll(0);
+                ESP_LOGI("TASK", "Task wurde gelöscht.");
+            }
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        int64_t time_since_boot = esp_timer_get_time();//systime in us
+        //ESP_LOGI("TIME", "Ich laufe seit %lld Sekunden", time_since_boot/1000/1000);
+        //ledWriteAll(swtichReadAll()<<0 | buttonReadAll()<<8);
+        //ledWriteAll(0x5555);
+
+        //vTaskDelay(pdMS_TO_TICKS(10));//Warte 10 ms (auch Tasks mit tieferer Prio werden behandelt)
+        //vTaskDelay(1);//Warte 1 Tick (10 ms, auch Tasks mit tieferer Prio werden behandelt)
+        //vTaskDelay(0);//Warte 0 Ticks (0 ms, nur Tasks mit höherer Prio werden behandelt) 
+        //taskYIELD();//Behandle Tasks mit höherer Prio
+        //esp_task_wdt_reset(); // Den Watchdog für die aktuelle Task zurücksetzen
+        //ESP_LOGI(TAG, "Das war Iteration %lu.",iterations);
+        iterations++;
     }
+}
+
+
+
+// Die eigentliche Blink-Funktion
+void blink_led_task(void *pvParameters) {
+    ESP_LOGI("BLINK_TASK", "Blink-Task gestartet.");
+    
+    while(1) {
+        
+            ledWriteAll(0xFFFF); // Alle LEDs an
+            vTaskDelay(pdMS_TO_TICKS(500));
+            ledWriteAll(0x0000); // Alle LEDs aus
+            vTaskDelay(pdMS_TO_TICKS(500));
+        
+        
+            
+        }
+    
 }
