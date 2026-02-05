@@ -12,8 +12,8 @@ sdkconfig
 sdkconfig.old
 
 # IDE-spezifische Ordner
-.vscode/
-.idea/
+/uC-Board-Treiber/.vscode/
+/uC-Board-Treiber/.idea/
 
 # Temporäre Dateien
 *.swp
