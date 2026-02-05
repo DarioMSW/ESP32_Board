@@ -8,8 +8,8 @@ __pycache__/
 *$py.class
 
 # Lokale Konfigurationsdateien (Hardware-Einstellungen)
-sdkconfig
-sdkconfig.old
+/uC-Board-Treiber/sdkconfig
+/uC-Board-Treiber/sdkconfig.old
 
 # IDE-spezifische Ordner
 /uC-Board-Treiber/.vscode/
