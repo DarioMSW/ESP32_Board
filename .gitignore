@@ -1,4 +1,5 @@
 # ESP-IDF Build-Ordner
+/uC-Board-Treiber/build
 build/
 
 # Python-Kopfdaten und Artefakte
