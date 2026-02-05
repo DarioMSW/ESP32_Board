@@ -98,7 +98,9 @@ void initI2C (void){
     i2c_param_config(I2C_NUM_0, &i2c_config); // Configure the I2C master driver
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0); // Install the I2C master driver
     */
-
+    //Reset i2c pins after boot finishes
+    gpio_reset_pin(SDA);
+    gpio_reset_pin(SCL);
     // New I2C driver initialization
     i2c_master_bus_config_t i2c_bus_config = {
         .i2c_port = I2C_NUM_0,
