@@ -1,0 +1,21 @@
+# ESP-IDF Build-Ordner
+build/
+
+# Python-Kopfdaten und Artefakte
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Lokale Konfigurationsdateien (Hardware-Einstellungen)
+sdkconfig
+sdkconfig.old
+
+# IDE-spezifische Ordner
+.vscode/
+.idea/
+
+# Temporäre Dateien
+*.swp
+*.bak
+
+
